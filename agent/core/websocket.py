@@ -8,6 +8,8 @@ from agent.collectors.cpu import collect as cpu
 from agent.collectors.memory import collect as memory
 from agent.collectors.disk import collect as disk
 from agent.collectors.network import collect as network
+from agent.collectors.suricata import collect as suricata
+from agent.collectors.system import collect as system_info
 
 
 METRIC_INTERVAL = 5  # detik
@@ -47,18 +49,20 @@ async def handle_messages(ws, logger):
             block_ip(ip, duration)
             logger.warning(f"Blocked IP {ip} for {duration}s")
 
-from agent.checks.suricata import collect_suricata_status
 import time
 
-async def send_agent_status(ws):
+async def send_agent_status(ws, logger):
     while True:
         payload = {
             "type": "agent_status",
             "payload": {
-                "suricata": collect_suricata_status()
+                "suricata": suricata(),
+                "system": system_info(),
             },
             "timestamp": int(time.time()),
         }
+
+        logger.info("Sent agent status payload")
 
         await ws.send(json.dumps(payload))
         await asyncio.sleep(30)  # tiap 30 detik

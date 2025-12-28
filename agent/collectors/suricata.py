@@ -1,21 +1,24 @@
 import os
 import subprocess
-import time
 
 SURICATA_EVE_PATHS = [
     "/var/log/suricata/eve.json",
     "/var/log/suricata/eve.log",
 ]
 
-def is_suricata_installed() -> bool:
+def _cmd_exists(cmd: str) -> bool:
     return subprocess.call(
-        ["which", "suricata"],
+        ["which", cmd],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     ) == 0
 
 
-def is_suricata_running() -> bool:
+def is_installed() -> bool:
+    return _cmd_exists("suricata")
+
+
+def is_running() -> bool:
     return subprocess.call(
         ["systemctl", "is-active", "--quiet", "suricata"]
     ) == 0
@@ -27,11 +30,29 @@ def find_eve_log():
             return path
     return None
 
+def _get_version():
+    try:
+        result = subprocess.run(
+            ["suricata", "-V"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        output = result.stdout.strip()
 
-def collect_suricata_status():
-    installed = is_suricata_installed()
-    running = is_suricata_running() if installed else False
+        # "This is Suricata version 6.0.14 RELEASE"
+        if "version" in output.lower():
+            return output.replace("This is Suricata version ", "")
+        return output
+    except Exception:
+        return None
+
+
+def collect():
+    installed = is_installed()
+    running = is_running() if installed else False
     eve_path = find_eve_log()
+    version = _get_version() if installed else None
 
     last_modified = None
     if eve_path:
@@ -42,5 +63,6 @@ def collect_suricata_status():
         "running": running,
         "eveLogExists": eve_path is not None,
         "eveLogPath": eve_path,
+        "version": version,
         "lastModified": last_modified,
     }

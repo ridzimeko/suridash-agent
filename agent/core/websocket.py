@@ -89,6 +89,7 @@ async def send_agent_status(ws, logger):
             "payload": {
                 "suricata": suricata(),
                 "system": system_info(),
+                "rules_loaded": suricata.get_rules_loaded(),
             },
             "timestamp": int(time.time()),
         }

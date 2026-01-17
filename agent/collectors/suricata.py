@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 
@@ -47,6 +48,15 @@ def _get_version():
     except Exception:
         return None
 
+def get_rules_loaded():
+    try:
+        with open(SURICATA_EVE_PATHS, "r") as f:
+            for line in reversed(f.readlines()[-200:]):
+                data = json.loads(line)
+                if data.get("event_type") == "stats":
+                    return data["stats"]["detect"].get("rules_loaded", 0)
+    except Exception:
+        return 0
 
 def collect():
     installed = is_installed()

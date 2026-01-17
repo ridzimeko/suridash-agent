@@ -39,7 +39,7 @@ def block_ip(ip: str, timeout: int | None = None) -> bool:
     _block_cooldown[ip] = now
     timeout = timeout or DEFAULT_TIMEOUT
 
-    _run(["ipset", "add", IPSET_NAME, ip, "timeout", str(timeout), "-exist"])
+    _run(["sudo", "ipset", "add", IPSET_NAME, ip, "timeout", str(timeout), "-exist"])
     print(f"[blocker] blocked {ip} for {timeout}s")
     return True
 

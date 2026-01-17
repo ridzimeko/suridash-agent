@@ -2,10 +2,8 @@ import os
 from dotenv import load_dotenv
 
 def load_config():
-    if os.getenv("ENV") == "development":
-        load_dotenv(".env")
-    else:
-        load_dotenv("/etc/suridash-agent/config.env")
+    ENV_PATH = os.environ.get("SURIDASH_ENV", "agent.env")
+    load_dotenv(ENV_PATH)
 
     return {
         "AGENT_ID": os.getenv("AGENT_ID"),

@@ -2,3 +2,4 @@ psutil
 requests
 websockets==10.1
 python-dotenv
+pyinstaller

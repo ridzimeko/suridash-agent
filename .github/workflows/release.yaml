@@ -1,20 +1,78 @@
-name: Build Agent
+name: Build & Release (amd64 + arm64)
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write  # diperlukan untuk upload asset ke GitHub Release
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runs_on: ubuntu-latest
+          - arch: arm64
+            runs_on: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runs_on }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --onefile --name suridash-agent agent/main.py
-      - uses: softprops/action-gh-release@v2
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pyinstaller
+
+      - name: Build binary
+        run: |
+          pyinstaller --clean --noconfirm --onefile --name suridash-agent run_agent.py
+          ./dist/suridash-agent --help || true
+
+      - name: Package
+        run: |
+          mkdir -p out
+          cp dist/suridash-agent out/
+          tar -czf suridash-agent-linux-${{ matrix.arch }}.tar.gz -C out suridash-agent
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: dist/suridash-agent
+          name: suridash-agent-linux-${{ matrix.arch }}
+          path: suridash-agent-linux-${{ matrix.arch }}.tar.gz
+
+  release:
+    name: Upload to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: suridash-agent-linux-*
+          merge-multiple: true
+
+      - name: List files
+        run: ls -la
+
+      - name: Publish Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            suridash-agent-linux-amd64.tar.gz
+            suridash-agent-linux-arm64.tar.gz

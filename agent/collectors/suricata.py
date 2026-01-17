@@ -63,6 +63,7 @@ def collect():
     running = is_running() if installed else False
     eve_path = find_eve_log()
     version = _get_version() if installed else None
+    rules_loaded = get_rules_loaded() if installed else 0
 
     last_modified = None
     if eve_path:
@@ -74,5 +75,6 @@ def collect():
         "eveLogExists": eve_path is not None,
         "eveLogPath": eve_path,
         "version": version,
+        "rulesLoaded": rules_loaded,
         "lastModified": last_modified,
     }

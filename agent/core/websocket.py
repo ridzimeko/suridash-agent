@@ -8,10 +8,9 @@ from agent.collectors.cpu import collect as cpu
 from agent.collectors.memory import collect as memory
 from agent.collectors.disk import collect as disk
 from agent.collectors.network import collect as network
-
+from agent.checks.suricata import collect_suricata_status
 
 METRIC_INTERVAL = 5  # detik
-
 
 def collect_metrics():
     return {
@@ -41,14 +40,41 @@ async def handle_messages(ws, logger):
         data = json.loads(message)
 
         if data.get("type") == "block_ip":
-            ip = data["ip"]
-            duration = data.get("duration", 3600)
+            ip = data.get("ip")
+            duration = int(data.get("duration", 3600))
+            severity = data.get("severity")
 
-            block_ip(ip, duration)
-            logger.warning(f"Blocked IP {ip} for {duration}s")
+            # Optional: double-check severity di agent juga
+            if severity is not None and int(severity) > 2:
+                await ws.send(json.dumps({
+                    "type": "block_ip_status",
+                    "ip": ip,
+                    "ok": False,
+                    "error": "severity too low",
+                }))
+                continue
 
-from agent.checks.suricata import collect_suricata_status
-import time
+            # Jalankan block_ip di thread supaya tidak blocking event loop
+            try:
+                ok = await asyncio.to_thread(block_ip, ip, duration)
+                logger.warning(f"Blocked IP {ip} for {duration}s (ok={ok})")
+
+                await ws.send(json.dumps({
+                    "type": "block_ip_status",
+                    "ip": ip,
+                    "duration": duration,
+                    "ok": bool(ok),
+                }))
+            except Exception as e:
+                logger.error(f"Block IP failed: {e}")
+                await ws.send(json.dumps({
+                    "type": "block_ip_status",
+                    "ip": ip,
+                    "duration": duration,
+                    "ok": False,
+                    "error": str(e),
+                }))
+
 
 async def send_agent_status(ws):
     while True:

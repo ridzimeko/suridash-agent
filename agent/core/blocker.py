@@ -1,8 +1,55 @@
+import os
 import subprocess
+import ipaddress
+import time
 
-def block_ip(ip: str, timeout=3600):
-    subprocess.run(
-        f"ipset add suridash_blocklist {ip} timeout {timeout} -exist",
-        shell=True,
-        check=True,
-    )
+IPSET_NAME = os.environ.get("SURIDASH_IPSET_NAME", "suridash-blacklist")
+DEFAULT_TIMEOUT = int(os.environ.get("SURIDASH_BLOCK_TIMEOUT", "3600"))
+
+_block_cooldown = {}  # ip -> last_block_ts
+COOLDOWN_SECONDS = 5
+
+def _run(cmd: list[str]):
+    subprocess.run(cmd, check=True)
+
+def _is_public_ip(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+        return not (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_multicast
+            or addr.is_reserved
+            or addr.is_unspecified
+        )
+    except ValueError:
+        return False
+
+def block_ip(ip: str, timeout: int | None = None) -> bool:
+    if not _is_public_ip(ip):
+        print("[blocker] skip non-public ip:", ip)
+        return False
+
+    now = time.time()
+    last = _block_cooldown.get(ip, 0)
+    if now - last < COOLDOWN_SECONDS:
+        return True  # silently ignore spam
+
+    _block_cooldown[ip] = now
+    timeout = timeout or DEFAULT_TIMEOUT
+
+    _run(["ipset", "add", IPSET_NAME, ip, "timeout", str(timeout), "-exist"])
+    print(f"[blocker] blocked {ip} for {timeout}s")
+    return True
+
+def unblock_ip(ip: str) -> bool:
+    if not _is_public_ip(ip):
+        return False
+
+    try:
+        _run(["ipset", "del", IPSET_NAME, ip])
+        print("[blocker] unblocked", ip)
+        return True
+    except subprocess.CalledProcessError:
+        return False

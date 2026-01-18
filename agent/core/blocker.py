@@ -27,6 +27,7 @@ def _is_public_ip(ip: str) -> bool:
             or addr.is_multicast
             or addr.is_reserved
             or addr.is_unspecified
+            or addr in ipaddress.ip_network("100.64.0.0/10")
         )
     except ValueError:
         return False

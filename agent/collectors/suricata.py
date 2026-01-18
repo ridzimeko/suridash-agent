@@ -54,7 +54,7 @@ def get_rules_loaded():
             for line in reversed(f.readlines()[-200:]):
                 data = json.loads(line)
                 if data.get("event_type") == "stats":
-                    return data["stats"]["detect"].get("rules_loaded", 0)
+                    return data["stats"]["detect"]["engines"].get("rules_loaded", 0)
     except Exception:
         return 0
 

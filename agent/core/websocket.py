@@ -4,7 +4,7 @@ import time
 import websockets
 import threading
 
-from agent.core.blocker import block_ip
+from agent.core.blocker import block_ip, unblock_ip
 from agent.collectors.cpu import collect as cpu
 from agent.collectors.memory import collect as memory
 from agent.collectors.disk import collect as disk
@@ -53,7 +53,7 @@ async def handle_messages(ws, logger):
             # Optional: double-check severity di agent juga
             if severity is not None and int(severity) > 2:
                 await ws.send(json.dumps({
-                    "type": "block_ip_status",
+                    "type": "block_ip_ack",
                     "ip": ip,
                     "ok": False,
                     "error": "severity too low",
@@ -66,7 +66,7 @@ async def handle_messages(ws, logger):
                 logger.warning(f"Blocked IP {ip} for {duration}s (ok={ok})")
 
                 await ws.send(json.dumps({
-                    "type": "block_ip_status",
+                    "type": "block_ip_ack",
                     "ip": ip,
                     "duration": duration,
                     "ok": bool(ok),
@@ -74,9 +74,28 @@ async def handle_messages(ws, logger):
             except Exception as e:
                 logger.error(f"Block IP failed: {e}")
                 await ws.send(json.dumps({
-                    "type": "block_ip_status",
+                    "type": "block_ip_ack",
                     "ip": ip,
                     "duration": duration,
+                    "ok": False,
+                    "error": str(e),
+                }))
+
+        elif data.get("type") == "unblock_ip":
+            ip = data.get("ip")
+
+            try:
+                ok = await asyncio.to_thread(unblock_ip, ip)
+                logger.warning(f"Unblocked IP {ip} (ok={ok})")
+                await ws.send(json.dumps({
+                    "type": "unblock_ip_ack",
+                    "ip": ip,
+                    "ok": bool(ok),
+                }))
+            except Exception as e:
+                await ws.send(json.dumps({
+                    "type": "unblock_ip_ack",
+                    "ip": ip,
                     "ok": False,
                     "error": str(e),
                 }))

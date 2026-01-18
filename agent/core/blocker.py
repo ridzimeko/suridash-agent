@@ -48,7 +48,7 @@ def unblock_ip(ip: str) -> bool:
         return False
 
     try:
-        _run(["ipset", "del", IPSET_NAME, ip])
+        _run(["sudo", "ipset", "del", IPSET_NAME, ip])
         print("[blocker] unblocked", ip)
         return True
     except subprocess.CalledProcessError:

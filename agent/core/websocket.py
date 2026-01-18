@@ -4,7 +4,7 @@ import time
 import websockets
 import threading
 
-from agent.core.blocker import block_ip, unblock_ip
+from agent.core.blocker import block_ip, is_ip_blocked, unblock_ip
 from agent.collectors.cpu import collect as cpu
 from agent.collectors.memory import collect as memory
 from agent.collectors.disk import collect as disk
@@ -133,29 +133,46 @@ def suricata_tail_worker(eve_path, logger, loop):
         except Exception as e:
             logger.error(f"Queue error: {e}")
 
+def _build_alert_payload(alert: dict) -> dict:
+    # lebih aman: pakai get() agar tidak KeyError
+    a = alert.get("alert") or {}
+    return {
+        "signature": a.get("signature"),
+        "signatureId": a.get("signature_id"),
+        "timestamp": alert.get("timestamp"),
+        "srcIp": alert.get("src_ip"),
+        "destIp": alert.get("dest_ip"),
+        "srcPort": alert.get("src_port"),
+        "destPort": alert.get("dest_port"),
+        "protocol": alert.get("proto"),
+        "category": a.get("category"),
+        "severity": a.get("severity"),
+    }
 
 async def send_suricata_alerts(ws, logger):
     while True:
         alert = await alert_queue.get()
 
-        payload = {
-            "type": "suricata_alert",
-            "payload": {
-                "signature": alert["alert"]["signature"],
-                "signatureId": alert["alert"]["signature_id"],
-                "timestamp": alert.get("timestamp"),
-                "srcIp": alert.get("src_ip"),
-                "destIp": alert.get("dest_ip"),
-                "srcPort": alert.get("src_port"),
-                "destPort": alert.get("dest_port"),
-                "protocol": alert.get("proto"),
-                "category": alert["alert"]["category"],
-                "severity": alert["alert"]["severity"],
-            },
-        }
+        try:
+            src_ip = alert.get("src_ip")
 
-        logger.info(f"Sent Suricata alert: {alert['alert']['signature']}")
-        await ws.send(json.dumps(payload))
+            # ✅ FILTER: kalau IP sudah diblokir ipset, jangan kirim ke server
+            if src_ip and is_ip_blocked(src_ip):
+                # optional log biar tahu dia discard
+                # logger.info(f"Skip alert from blocked IP: {src_ip}")
+                continue
+
+            payload = {
+                "type": "suricata_alert",
+                "payload": _build_alert_payload(alert),
+            }
+
+            sig = (alert.get("alert") or {}).get("signature", "unknown")
+            logger.info(f"Sent Suricata alert: {sig}")
+            await ws.send(json.dumps(payload))
+
+        finally:
+            alert_queue.task_done()
 
 async def run_ws(config, logger):
     ws_url = config["SERVER_URL"].replace("http", "ws") + "/ws/agent"

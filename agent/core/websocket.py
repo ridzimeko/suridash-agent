@@ -12,6 +12,7 @@ from agent.collectors.network import collect as network
 from agent.collectors.suricata import collect as suricata
 from agent.collectors.system import collect as system_info
 from agent.collectors.suricata_alerts import tail_eve_alerts
+from agent.utils.deduper import dedup_allow, fingerprint_suricata_alert
 
 METRIC_INTERVAL = 5  # detik
 STATUS_INTERVAL = 30  # detik
@@ -126,10 +127,25 @@ def suricata_tail_worker(eve_path, logger, loop):
 
     for alert in tail_eve_alerts(eve_path):
         try:
-            asyncio.run_coroutine_threadsafe(
-                alert_queue.put(alert),
-                loop,
-            )
+            src_ip = alert.get("src_ip")
+
+            # (opsional) jangan enqueue kalau IP sudah diblokir
+            if src_ip and is_ip_blocked(src_ip):
+                continue
+
+            # ✅ DEDUP: kalau fingerprint sudah pernah dikirim -> skip
+            key = fingerprint_suricata_alert(alert, bucket_seconds=5)
+            if not dedup_allow(key, ttl_seconds=10):
+                continue
+
+            def _enqueue():
+                try:
+                    alert_queue.put_nowait(alert)
+                except asyncio.QueueFull:
+                    logger.warning("Alert queue full, dropping alert")
+
+            loop.call_soon_threadsafe(_enqueue)
+
         except Exception as e:
             logger.error(f"Queue error: {e}")
 

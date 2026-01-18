@@ -79,7 +79,7 @@ def is_ip_blocked(ip: str) -> bool:
     # ipset test <set> <ip> -> exit code 0 kalau ada, 1 kalau tidak ada
     try:
         subprocess.run(
-            ["ipset", "test", IPSET_NAME, ip],
+            ["sudo", "ipset", "test", IPSET_NAME, ip],
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

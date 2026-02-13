@@ -27,9 +27,9 @@ def install_packages():
         run(["apt", "update", "-y"])
         run(["apt", "install", "-y", "ipset", "iptables", "ipset-persistent", "netfilter-persistent"])
 
-    elif have("yum"):
+    elif have("dnf"):
         print("Detected RHEL/CentOS/Rocky/Alma")
-        run(["yum", "install", "-y", "ipset", "iptables-services", "iptables"])
+        run(["dnf", "install", "-y", "ipset", "iptables-services", "iptables"])
 
     elif have("apk"):
         print("Detected Alpine Linux")

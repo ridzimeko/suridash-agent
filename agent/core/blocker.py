@@ -11,7 +11,7 @@ _block_cooldown = {}  # ip -> last_block_ts
 COOLDOWN_SECONDS = 5
 
 _BLOCKED_CACHE: Dict[str, Tuple[bool, float]] = {}
-CACHE_TTL_SECONDS = int(os.environ.get("SURIDASH_IPSET_CACHE_TTL", "3"))  # kecil tapi efektif
+CACHE_TTL_SECONDS = int(os.environ.get("SURIDASH_IPSET_CACHE_TTL", "10"))  # kecil tapi efektif
 MAX_CACHE_SIZE = 10_000
 
 def _run(cmd: list[str]):

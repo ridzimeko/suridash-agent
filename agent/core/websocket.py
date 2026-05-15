@@ -5,6 +5,7 @@ import websockets
 import threading
 
 from agent.core.blocker import block_ip, is_ip_blocked, unblock_ip
+from agent.core.auto_blocker import auto_block_from_alert, AUTO_BLOCK_TIMEOUT
 from agent.collectors.cpu import collect as cpu
 from agent.collectors.memory import collect as memory
 from agent.collectors.disk import collect as disk
@@ -15,7 +16,7 @@ from agent.collectors.suricata_alerts import tail_eve_alerts
 from agent.utils.deduper import dedup_allow, fingerprint_suricata_alert
 
 METRIC_INTERVAL = 5  # detik
-STATUS_INTERVAL = 30  # detik
+STATUS_INTERVAL = 10  # detik
 
 alert_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
 
@@ -174,9 +175,22 @@ async def send_suricata_alerts(ws, logger):
 
             # ✅ FILTER: kalau IP sudah diblokir ipset, jangan kirim ke server
             if src_ip and is_ip_blocked(src_ip):
-                # optional log biar tahu dia discard
-                # logger.info(f"Skip alert from blocked IP: {src_ip}")
                 continue
+
+            # 🛡️ AUTO-BLOCK: blokir IP jika severity <= threshold
+            blocked = await asyncio.to_thread(auto_block_from_alert, alert)
+            if blocked:
+                a = alert.get("alert") or {}
+                await ws.send(json.dumps({
+                    "type": "block_ip_ack",
+                    "ip": src_ip,
+                    "duration": AUTO_BLOCK_TIMEOUT,
+                    "ok": True,
+                    "source": "auto",
+                    "severity": a.get("severity"),
+                    "signature": a.get("signature"),
+                }))
+                logger.info(f"Sent block_ip_ack for auto-blocked {src_ip}")
 
             payload = {
                 "type": "suricata_alert",

@@ -48,22 +48,34 @@ def _get_version():
     except Exception:
         return None
 
-def get_rules_loaded():
-    try:
-        with open(SURICATA_EVE_PATHS, "r") as f:
-            for line in reversed(f.readlines()[-200:]):
-                data = json.loads(line)
-                if data.get("event_type") == "stats":
-                    return data["stats"]["detect"]["engines"].get("rules_loaded", 0)
-    except Exception:
+def get_rules_loaded(eve_path):
+    if not eve_path:
         return 0
+    try:
+        with open(eve_path, "r") as f:
+            # Baca 500 baris terakhir karena log bisa sangat ramai
+            lines = f.readlines()[-500:]
+            for line in reversed(lines):
+                try:
+                    data = json.loads(line)
+                    if data.get("event_type") == "stats":
+                        engines = data.get("stats", {}).get("detect", {}).get("engines", [])
+                        if isinstance(engines, list) and len(engines) > 0:
+                            return engines[0].get("rules_loaded", 0)
+                        elif isinstance(engines, dict):
+                            return engines.get("rules_loaded", 0)
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        pass
+    return 0
 
 def collect():
     installed = is_installed()
     running = is_running() if installed else False
     eve_path = find_eve_log()
     version = _get_version() if installed else None
-    rules_loaded = get_rules_loaded() if installed else 0
+    rules_loaded = get_rules_loaded(eve_path) if installed else 0
 
     last_modified = None
     if eve_path:

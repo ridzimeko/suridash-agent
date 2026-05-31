@@ -9,4 +9,6 @@ def load_config():
         "AGENT_ID": os.getenv("AGENT_ID"),
         "API_KEY": os.getenv("API_KEY"),
         "SERVER_URL": os.getenv("SERVER_URL"),
+        "DEDUP_BUCKET": int(os.getenv("SURIDASH_DEDUP_BUCKET", "20")),
+        "DEDUP_TTL": int(os.getenv("SURIDASH_DEDUP_TTL", "25")),
     }

@@ -135,8 +135,10 @@ def suricata_tail_worker(eve_path, logger, loop):
                 continue
 
             # ✅ DEDUP: kalau fingerprint sudah pernah dikirim -> skip
-            key = fingerprint_suricata_alert(alert, bucket_seconds=5)
-            if not dedup_allow(key, ttl_seconds=10):
+            key = fingerprint_suricata_alert(alert, bucket_seconds=20)
+            if not dedup_allow(key, ttl_seconds=25):
+                sig_name = (alert.get("alert") or {}).get("signature", "unknown")
+                logger.info(f"Alert deduplicated/delayed: {sig_name}")
                 continue
 
             def _enqueue():

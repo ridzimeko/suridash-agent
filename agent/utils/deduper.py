@@ -27,17 +27,19 @@ def fingerprint_suricata_alert(alert: dict, bucket_seconds: int = 5) -> str:
     src_ip = alert.get("src_ip") or ""
     dest_ip = alert.get("dest_ip") or ""
     proto = alert.get("proto") or ""
-    src_port = str(alert.get("src_port") or 0)
     dest_port = str(alert.get("dest_port") or 0)
 
     sig_id = str(a.get("signature_id") or 0)
     rev = str(a.get("rev") or 0)
     severity = str(a.get("severity") or 0)
+    category = str(a.get("category") or "")
 
     # time bucket (gunakan waktu agent agar sederhana)
     bucket = int(time.time() // bucket_seconds)
 
-    raw = "|".join([src_ip, dest_ip, proto, src_port, dest_port, sig_id, rev, severity, str(bucket)])
+    # Hapus src_port agar serangan beruntun dari IP yang sama via port berbeda terdeduplikasi.
+    # Kita bisa juga pakai 'category' untuk dedup tipe serangan yang sama (misal XSS)
+    raw = "|".join([src_ip, dest_ip, proto, dest_port, sig_id, rev, severity, category, str(bucket)])
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 def dedup_allow(key: str, ttl_seconds: int = 10) -> bool:

@@ -32,18 +32,35 @@ def should_auto_block(alert: dict) -> bool:
     if not AUTO_BLOCK_ENABLED:
         return False
 
+    # Keyword-based auto-block (e.g. "sql injection,xss,dos")
+    AUTO_BLOCK_KEYWORDS = os.environ.get("SURIDASH_AUTO_BLOCK_KEYWORDS", "").lower()
+    keywords = [k.strip() for k in AUTO_BLOCK_KEYWORDS.split(",") if k.strip()]
+
     a = alert.get("alert") or {}
     severity = a.get("severity")
+    signature = a.get("signature", "").lower()
+    category = a.get("category", "").lower()
 
-    if severity is None:
-        return False
+    # Cek apakah cocok dengan keyword spesifik (jika ada keyword)
+    matched_keyword = False
+    if keywords:
+        for kw in keywords:
+            if kw in signature or kw in category:
+                matched_keyword = True
+                break
 
-    try:
-        severity = int(severity)
-    except (ValueError, TypeError):
-        return False
+    # Cek berdasarkan severity (jika severity tersetting)
+    matched_severity = False
+    if severity is not None:
+        try:
+            severity = int(severity)
+            if severity <= AUTO_BLOCK_SEVERITY:
+                matched_severity = True
+        except (ValueError, TypeError):
+            pass
 
-    if severity > AUTO_BLOCK_SEVERITY:
+    # Blokir jika masuk kriteria severity ATAU kriteria keyword
+    if not (matched_severity or matched_keyword):
         return False
 
     src_ip = alert.get("src_ip")

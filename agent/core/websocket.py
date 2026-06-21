@@ -105,6 +105,7 @@ async def handle_messages(ws, logger):
 
 async def send_agent_status(ws, logger):
     while True:
+        logger.info("Fetching agent status...")
         payload = {
             "type": "agent_status",
             "payload": {
@@ -252,5 +253,8 @@ async def run_ws(config, logger):
                 await asyncio.gather(*tasks)
 
         except Exception as e:
-            logger.error(f"WebSocket error: {e}")
+            error_msg = str(e)
+            if "<html" in error_msg.lower() or "<!doctype" in error_msg.lower():
+                error_msg = "error (html response hidden)"
+            logger.error(f"WebSocket error: {error_msg}")
             await asyncio.sleep(5)

@@ -17,13 +17,17 @@ def start_heartbeat(config, logger):
             )
 
             # === LOG BERDASARKAN RESPONSE ===
+            response_text = response.text
+            if "<html" in response_text.lower() or "<!doctype" in response_text.lower():
+                response_text = "error (html response hidden)"
+
             if response.ok:  # status 2xx
                 logger.info(
-                    f"Heartbeat success | status={response.status_code} | response={response.text}"
+                    f"Heartbeat success | status={response.status_code} | response={response_text}"
                 )
             else:
                 logger.warning(
-                    f"Heartbeat failed | status={response.status_code} | response={response.text}"
+                    f"Heartbeat failed | status={response.status_code} | response={response_text}"
                 )
 
         except requests.exceptions.RequestException as e:

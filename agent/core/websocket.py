@@ -51,6 +51,7 @@ async def handle_messages(ws, logger):
             ip = data.get("ip")
             duration = int(data.get("duration", 3600))
             severity = data.get("severity")
+            reason = data.get("reason")
 
             # Optional: double-check severity di agent juga
             if severity is not None and int(severity) > 2:
@@ -59,19 +60,21 @@ async def handle_messages(ws, logger):
                     "ip": ip,
                     "ok": False,
                     "error": "severity too low",
+                    "reason": reason,
                 }))
                 continue
 
             # Jalankan block_ip di thread supaya tidak blocking event loop
             try:
                 ok = await asyncio.to_thread(block_ip, ip, duration)
-                logger.warning(f"Blocked IP {ip} for {duration}s (ok={ok})")
+                logger.warning(f"Blocked IP {ip} for {duration}s (ok={ok}, reason={reason})")
 
                 await ws.send(json.dumps({
                     "type": "block_ip_ack",
                     "ip": ip,
                     "duration": duration,
                     "ok": bool(ok),
+                    "reason": reason,
                 }))
             except Exception as e:
                 logger.error(f"Block IP failed: {e}")
@@ -81,6 +84,7 @@ async def handle_messages(ws, logger):
                     "duration": duration,
                     "ok": False,
                     "error": str(e),
+                    "reason": reason,
                 }))
 
         elif data.get("type") == "unblock_ip":
@@ -194,8 +198,9 @@ async def send_suricata_alerts(ws, logger):
                     "source": "auto",
                     "severity": a.get("severity"),
                     "signature": a.get("signature"),
+                    "reason": a.get("signature"),
                 }))
-                logger.info(f"Sent block_ip_ack for auto-blocked {src_ip}")
+                logger.info(f"Sent block_ip_ack for auto-blocked {src_ip} (reason={a.get('signature')})")
 
             payload = {
                 "type": "suricata_alert",

@@ -128,7 +128,7 @@ async def send_agent_status(ws, logger):
 # =========================
 # SURICATA ALERT PIPELINE
 # =========================
-def suricata_tail_worker(eve_path, logger, loop):
+def suricata_tail_worker(config, eve_path, logger, loop):
     logger.info(f"Suricata tail worker started ({eve_path})")
 
     for alert in tail_eve_alerts(eve_path):
@@ -247,7 +247,7 @@ async def run_ws(config, logger):
 
                     threading.Thread(
                         target=suricata_tail_worker,
-                        args=(eve_log_path, logger, loop),
+                        args=(config, eve_log_path, logger, loop),
                         daemon=True,
                     ).start()
 

@@ -52,10 +52,11 @@ def get_rules_loaded(eve_path):
     if not eve_path:
         return 0
     try:
+        from collections import deque
         with open(eve_path, "r") as f:
-            # Baca 500 baris terakhir karena log bisa sangat ramai
-            lines = f.readlines()[-500:]
-            for line in reversed(lines):
+            # Menggunakan deque untuk efisiensi memori (tidak membaca seluruh file ke RAM)
+            lines = deque(f, maxlen=500)
+            for line in reversed(list(lines)):
                 try:
                     data = json.loads(line)
                     if data.get("event_type") == "stats":

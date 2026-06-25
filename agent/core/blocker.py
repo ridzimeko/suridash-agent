@@ -42,6 +42,10 @@ def block_ip(ip: str, timeout: int | None = None) -> bool:
     if now - last < COOLDOWN_SECONDS:
         return True  # silently ignore spam
 
+    # Prevent memory leak from unbounded growth
+    if len(_block_cooldown) > 10_000:
+        _block_cooldown.clear()
+
     _block_cooldown[ip] = now
     timeout = timeout or DEFAULT_TIMEOUT
 

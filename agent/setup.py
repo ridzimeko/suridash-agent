@@ -44,7 +44,7 @@ def install_packages():
 
 def create_ipset():
     print(f"=== [2/6] Creating ipset {SET_NAME} ===")
-    run(["ipset", "create", SET_NAME, "hash:ip", "family", "inet", "hashsize", "4096", "maxelem", "65536", "timeout", AUTO_BLOCK_TIMEOUT, "-exist"])
+    run(["ipset", "create", SET_NAME, "hash:ip", "family", "inet", "hashsize", "4096", "maxelem", "65536", "timeout", str(AUTO_BLOCK_TIMEOUT), "-exist"])
     print(f"✔ ipset '{SET_NAME}' created or already exists")
 
 def ensure_iptables_rule():
@@ -98,6 +98,20 @@ def persist_rules():
 
     print("✔ Persistence configured")
 
+def setup_cron_persist():
+    print("=== [4.5/6] Setup cron for ipset autosave/restore ===")
+    cron_content = f"""# Suridash ipset auto-save and restore
+*/5 * * * * root ipset save {SET_NAME} > /etc/suridash-ipset.save 2>/dev/null
+@reboot root sleep 10 && ipset restore < /etc/suridash-ipset.save 2>/dev/null
+"""
+    try:
+        with open("/etc/cron.d/suridash-ipset", "w") as f:
+            f.write(cron_content)
+        os.chmod("/etc/cron.d/suridash-ipset", 0o644)
+        print("✔ Cron jobs for ipset created at /etc/cron.d/suridash-ipset")
+    except Exception as e:
+        print(f"❌ Failed to setup cron: {e}")
+
 def test_ipset():
     print("=== [5/6] Testing ipset ===")
     try:
@@ -121,6 +135,7 @@ def main():
     create_ipset()
     ensure_iptables_rule()
     persist_rules()
+    setup_cron_persist()
     test_ipset()
 
     print("=== [6/6] Setup finished ===\n")

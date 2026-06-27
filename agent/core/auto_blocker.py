@@ -20,8 +20,7 @@ logger = logging.getLogger("suridash-agent")
 # Konfigurasi via environment
 AUTO_BLOCK_ENABLED = os.environ.get("SURIDASH_AUTO_BLOCK", "true").lower() == "true"
 AUTO_BLOCK_SEVERITY = int(os.environ.get("SURIDASH_AUTO_BLOCK_SEVERITY", "2"))
-AUTO_BLOCK_TIMEOUT = int(os.environ.get("SURIDASH_AUTO_BLOCK_TIMEOUT",
-                                         os.environ.get("SURIDASH_BLOCK_TIMEOUT", "3600")))
+AUTO_BLOCK_TIMEOUT = int(os.environ.get("SURIDASH_AUTO_BLOCK_TIMEOUT", "3600"))
 
 
 def should_auto_block(alert: dict) -> bool:

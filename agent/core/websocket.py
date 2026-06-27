@@ -159,7 +159,7 @@ def suricata_tail_worker(config, eve_path, logger, loop):
         except Exception as e:
             logger.error(f"Queue error: {e}")
 
-def _build_alert_payload(alert: dict) -> dict:
+def _build_alert_payload(alert: dict, is_blocked: bool = False) -> dict:
     # lebih aman: pakai get() agar tidak KeyError
     a = alert.get("alert") or {}
     return {
@@ -173,6 +173,8 @@ def _build_alert_payload(alert: dict) -> dict:
         "protocol": alert.get("proto"),
         "category": a.get("category"),
         "severity": a.get("severity"),
+        "status": "blocked" if is_blocked else "allowed",
+        "duration": AUTO_BLOCK_TIMEOUT if is_blocked else 0,
     }
 
 async def send_suricata_alerts(ws, logger):
@@ -195,7 +197,6 @@ async def send_suricata_alerts(ws, logger):
                     "ip": src_ip,
                     "duration": AUTO_BLOCK_TIMEOUT,
                     "ok": True,
-                    "source": "auto",
                     "severity": a.get("severity"),
                     "signature": a.get("signature"),
                     "reason": a.get("signature"),
@@ -204,7 +205,7 @@ async def send_suricata_alerts(ws, logger):
 
             payload = {
                 "type": "suricata_alert",
-                "payload": _build_alert_payload(alert),
+                "payload": _build_alert_payload(alert, is_blocked=bool(blocked)),
             }
 
             sig = (alert.get("alert") or {}).get("signature", "unknown")

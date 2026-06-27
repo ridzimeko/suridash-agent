@@ -5,7 +5,7 @@ import time
 from typing import Dict, Tuple
 
 IPSET_NAME = os.environ.get("SURIDASH_IPSET_NAME", "suridash-blacklist")
-DEFAULT_TIMEOUT = int(os.environ.get("SURIDASH_BLOCK_TIMEOUT", "3600"))
+DEFAULT_TIMEOUT = int(os.environ.get("SURIDASH_AUTO_BLOCK_TIMEOUT", "3600"))
 
 _block_cooldown = {}  # ip -> last_block_ts
 COOLDOWN_SECONDS = 5

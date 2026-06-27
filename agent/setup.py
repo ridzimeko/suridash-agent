@@ -6,6 +6,7 @@ import sys
 from typing import List
 
 SET_NAME = os.environ.get("SURIDASH_IPSET_NAME", "suridash-blacklist")
+AUTO_BLOCK_TIMEOUT = int(os.environ.get("SURIDASH_AUTO_BLOCK_TIMEOUT", "3600"))
 
 def run(cmd: List[str], check=True):
     print("+", " ".join(cmd))
@@ -43,7 +44,7 @@ def install_packages():
 
 def create_ipset():
     print(f"=== [2/6] Creating ipset {SET_NAME} ===")
-    run(["ipset", "create", SET_NAME, "hash:ip", "family", "inet", "hashsize", "4096", "maxelem", "65536", "-exist"])
+    run(["ipset", "create", SET_NAME, "hash:ip", "family", "inet", "hashsize", "4096", "maxelem", "65536", "timeout", AUTO_BLOCK_TIMEOUT, "-exist"])
     print(f"✔ ipset '{SET_NAME}' created or already exists")
 
 def ensure_iptables_rule():

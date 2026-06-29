@@ -16,6 +16,7 @@ import logging
 from agent.core.blocker import block_ip, is_ip_blocked
 
 logger = logging.getLogger("suridash-agent")
+block_logger = logging.getLogger("suridash-blocker")
 
 # Konfigurasi via environment
 AUTO_BLOCK_ENABLED = os.environ.get("SURIDASH_AUTO_BLOCK", "true").lower() == "true"
@@ -89,7 +90,7 @@ def auto_block_from_alert(alert: dict) -> bool:
     try:
         ok = block_ip(src_ip, AUTO_BLOCK_TIMEOUT)
         if ok:
-            logger.warning(
+            block_logger.warning(
                 f"[auto-block] Blocked {src_ip} | severity={severity} "
                 f"| sig=\"{signature}\" | timeout={AUTO_BLOCK_TIMEOUT}s"
             )

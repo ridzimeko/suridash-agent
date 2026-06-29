@@ -3,6 +3,9 @@ import subprocess
 import ipaddress
 import time
 from typing import Dict, Tuple
+import logging
+
+logger = logging.getLogger("suridash-blocker")
 
 IPSET_NAME = os.environ.get("SURIDASH_IPSET_NAME", "suridash-blacklist")
 DEFAULT_TIMEOUT = int(os.environ.get("SURIDASH_AUTO_BLOCK_TIMEOUT", "3600"))
@@ -50,7 +53,7 @@ def block_ip(ip: str, timeout: int | None = None) -> bool:
     timeout = timeout or DEFAULT_TIMEOUT
 
     _run(["sudo", "ipset", "add", IPSET_NAME, ip, "timeout", str(timeout), "-exist"])
-    print(f"[blocker] blocked {ip} for {timeout}s")
+    logger.info(f"[blocker] blocked {ip} for {timeout}s")
     return True
 
 def unblock_ip(ip: str) -> bool:
@@ -59,7 +62,7 @@ def unblock_ip(ip: str) -> bool:
 
     try:
         _run(["sudo", "ipset", "del", IPSET_NAME, ip])
-        print("[blocker] unblocked", ip)
+        logger.info(f"[blocker] unblocked {ip}")
         return True
     except subprocess.CalledProcessError:
         return False

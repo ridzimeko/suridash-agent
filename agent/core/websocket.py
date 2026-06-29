@@ -135,10 +135,6 @@ def suricata_tail_worker(config, eve_path, logger, loop):
         try:
             src_ip = alert.get("src_ip")
 
-            # (opsional) jangan enqueue kalau IP sudah diblokir
-            if src_ip and is_ip_blocked(src_ip):
-                continue
-
             # ✅ DEDUP: kalau fingerprint sudah pernah dikirim -> skip
             bucket_sec = config.get("DEDUP_BUCKET", 20)
             ttl_sec = config.get("DEDUP_TTL", 25)
@@ -184,13 +180,12 @@ async def send_suricata_alerts(ws, logger):
         try:
             src_ip = alert.get("src_ip")
 
-            # ✅ FILTER: kalau IP sudah diblokir ipset, jangan kirim ke server
-            if src_ip and is_ip_blocked(src_ip):
-                continue
+            # Cek apakah IP sudah dalam keadaan terblokir sebelumnya
+            already_blocked = is_ip_blocked(src_ip) if src_ip else False
 
             # 🛡️ AUTO-BLOCK: blokir IP jika severity <= threshold
-            blocked = await asyncio.to_thread(auto_block_from_alert, alert)
-            if blocked:
+            just_blocked = await asyncio.to_thread(auto_block_from_alert, alert)
+            if just_blocked:
                 a = alert.get("alert") or {}
                 await ws.send(json.dumps({
                     "type": "block_ip_ack",
@@ -203,9 +198,11 @@ async def send_suricata_alerts(ws, logger):
                 }))
                 logger.info(f"Sent block_ip_ack for auto-blocked {src_ip} (reason={a.get('signature')})")
 
+            is_now_blocked = already_blocked or just_blocked
+
             payload = {
                 "type": "suricata_alert",
-                "payload": _build_alert_payload(alert, is_blocked=bool(blocked)),
+                "payload": _build_alert_payload(alert, is_blocked=is_now_blocked),
             }
 
             sig = (alert.get("alert") or {}).get("signature", "unknown")

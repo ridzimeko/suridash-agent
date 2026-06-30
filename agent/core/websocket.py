@@ -145,9 +145,9 @@ def suricata_tail_worker(config, eve_path, logger, loop):
                 logger.info(f"Alert deduplicated/delayed: {sig_name}")
                 continue
 
-            def _enqueue():
+            def _enqueue(a=alert):
                 try:
-                    alert_queue.put_nowait(alert)
+                    alert_queue.put_nowait(a)
                 except asyncio.QueueFull:
                     logger.warning("Alert queue full, dropping alert")
 

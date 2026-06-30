@@ -19,6 +19,7 @@ METRIC_INTERVAL = 5  # detik
 STATUS_INTERVAL = 10  # detik
 
 alert_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+_tail_thread_started = False
 
 def collect_metrics():
     return {
@@ -187,16 +188,19 @@ async def send_suricata_alerts(ws, logger):
             just_blocked = await asyncio.to_thread(auto_block_from_alert, alert)
             if just_blocked:
                 a = alert.get("alert") or {}
-                await ws.send(json.dumps({
-                    "type": "block_ip_ack",
-                    "ip": src_ip,
-                    "duration": AUTO_BLOCK_TIMEOUT,
-                    "ok": True,
-                    "severity": a.get("severity"),
-                    "signature": a.get("signature"),
-                    "reason": a.get("signature"),
-                }))
-                logger.info(f"Sent block_ip_ack for auto-blocked {src_ip} (reason={a.get('signature')})")
+                try:
+                    await ws.send(json.dumps({
+                        "type": "block_ip_ack",
+                        "ip": src_ip,
+                        "duration": AUTO_BLOCK_TIMEOUT,
+                        "ok": True,
+                        "severity": a.get("severity"),
+                        "signature": a.get("signature"),
+                        "reason": a.get("signature"),
+                    }))
+                    logger.info(f"Sent block_ip_ack for auto-blocked {src_ip} (reason={a.get('signature')})")
+                except Exception as e:
+                    logger.error(f"Failed to send block_ip_ack: {e}")
 
             is_now_blocked = already_blocked or just_blocked
 
@@ -213,6 +217,7 @@ async def send_suricata_alerts(ws, logger):
             alert_queue.task_done()
 
 async def run_ws(config, logger):
+    global _tail_thread_started
     ws_url = config["SERVER_URL"].replace("http", "ws") + "/ws/agent"
     logger.info(f"Connecting to {ws_url}")
 
@@ -232,28 +237,43 @@ async def run_ws(config, logger):
                 suricata_status = suricata()
                 eve_log_path = suricata_status.get("eveLogPath")
 
-                tasks = [
-                    send_metrics(ws, logger),
-                    send_agent_status(ws, logger),
-                    handle_messages(ws, logger),
-                ]
-
                 loop = asyncio.get_running_loop()
 
                 if eve_log_path:
-                    logger.info(f"Streaming Suricata alerts from {eve_log_path}")
-
-                    threading.Thread(
-                        target=suricata_tail_worker,
-                        args=(config, eve_log_path, logger, loop),
-                        daemon=True,
-                    ).start()
-
-                    tasks.append(send_suricata_alerts(ws, logger))
+                    logger.info(f"Suricata alerts enabled, log path: {eve_log_path}")
+                    if not _tail_thread_started:
+                        threading.Thread(
+                            target=suricata_tail_worker,
+                            args=(config, eve_log_path, logger, loop),
+                            daemon=True,
+                        ).start()
+                        _tail_thread_started = True
                 else:
                     logger.warning("Suricata eve log not found, alert disabled")
 
-                await asyncio.gather(*tasks)
+                # Buat task dengan wrapper
+                tasks = [
+                    asyncio.create_task(send_metrics(ws, logger)),
+                    asyncio.create_task(send_agent_status(ws, logger)),
+                    asyncio.create_task(handle_messages(ws, logger)),
+                ]
+                
+                if eve_log_path:
+                    tasks.append(asyncio.create_task(send_suricata_alerts(ws, logger)))
+
+                # Tunggu sampai salah satu task selesai/error (termasuk websocket putus)
+                done, pending = await asyncio.wait(
+                    tasks,
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+
+                # Cancel semua task yang masih jalan
+                for task in pending:
+                    task.cancel()
+                    
+                # Raise exception jika ada task yang error
+                for task in done:
+                    task.result()
 
         except Exception as e:
             error_msg = str(e)
